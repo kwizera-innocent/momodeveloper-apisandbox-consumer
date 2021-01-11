@@ -1,8 +1,11 @@
 package rw.momo.api.momoapi.model;
 
-public class payer {
-    private String partyIdType = "MSISDN";
-    private String partyId = "46733123453";
+import javax.persistence.Embeddable;
+
+@Embeddable
+public class Payer {
+    private String partyIdType;
+    private String partyId;
 
     public String getPartyIdType() {
         return partyIdType;
@@ -18,5 +21,13 @@ public class payer {
 
     public void setPartyId(String partyId) {
         this.partyId = partyId;
+    }
+
+    public Payer(String partyIdType, String partyId) {
+        this.partyIdType = partyIdType;
+        this.partyId = partyId;
+    }
+
+    public Payer() {
     }
 }

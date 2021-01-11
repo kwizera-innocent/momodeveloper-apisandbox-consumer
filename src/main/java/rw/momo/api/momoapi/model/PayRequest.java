@@ -1,11 +1,15 @@
 package rw.momo.api.momoapi.model;
 
+import javax.persistence.Embedded;
+import javax.persistence.MappedSuperclass;
 
+@MappedSuperclass
 public class PayRequest {
     private String amount;
     private String currency;
     private String externalId;
-    private payer payer;
+    @Embedded
+    private Payer payer;
     private String payerMessage;
     private String payeeNote;
 
@@ -49,11 +53,11 @@ public class PayRequest {
         this.payeeNote = payeeNote;
     }
 
-    public payer getPayer() {
+    public Payer getPayer() {
         return payer;
     }
 
-    public void setPayer(payer payer) {
+    public void setPayer(Payer payer) {
         this.payer = payer;
     }
 }

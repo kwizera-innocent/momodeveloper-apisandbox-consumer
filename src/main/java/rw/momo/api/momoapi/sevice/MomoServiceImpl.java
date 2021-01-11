@@ -1,44 +1,44 @@
 package rw.momo.api.momoapi.sevice;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import rw.momo.api.momoapi.model.BalanceResponse;
-import rw.momo.api.momoapi.model.TokenResponse;
 import rw.momo.api.momoapi.model.PayRequest;
-import rw.momo.api.momoapi.model.payer;
+import rw.momo.api.momoapi.model.PayResponse;
+import rw.momo.api.momoapi.model.TokenResponse;
 
 @Service
 public class MomoServiceImpl implements IMomoService {
     Environment env;
     RestTemplate template;
+    IResponseService responseService;
 
     Logger LOGGER = LoggerFactory.getLogger(MomoServiceImpl.class);
 
     @Autowired
-    public MomoServiceImpl(Environment env, RestTemplate template) {
+    public MomoServiceImpl( RestTemplate template, IResponseService responseService, Environment env) {
         this.env = env;
         this.template = template;
+        this.responseService = responseService;
     }
 
     @Override
@@ -68,8 +68,8 @@ public class MomoServiceImpl implements IMomoService {
         LOGGER.info("headers: {}", headers);
         LOGGER.info("url: {}", env.getProperty("collection.balance-url"));
         try {
-            ResponseEntity<?> balance = template.exchange(env.getProperty("collection.balance-url"),
-                    HttpMethod.GET, entity, new ParameterizedTypeReference<String>() {
+            ResponseEntity<?> balance = template.exchange(env.getProperty("collection.balance-url"), HttpMethod.GET,
+                    entity, new ParameterizedTypeReference<String>() {
                     });
             // ObjectMapper mapper = new ObjectMapper();
             Gson gson = new Gson();
@@ -84,7 +84,8 @@ public class MomoServiceImpl implements IMomoService {
     }
 
     @Override
-    public ResponseEntity<Map<String, String>> requestToPay(PayRequest request) {
+    public ResponseEntity<PayResponse> requestToPay(PayRequest request) {
+
         String token = getToken().getAccess_token();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -105,14 +106,19 @@ public class MomoServiceImpl implements IMomoService {
                 HttpMethod.POST, entity, new ParameterizedTypeReference<String>() {
                 });
         Map<String, String> body = new HashMap<>();
+
+        PayResponse res = new PayResponse();
+        BeanUtils.copyProperties(request, res);
+        res.setReferenceId(refId);
+        res = responseService.createRequest(res);
         body.put("Reference-Id", refId);
-        return new ResponseEntity<Map<String,String>>(body ,responseEntity.getStatusCode());
+        return new ResponseEntity<PayResponse>(res, responseEntity.getStatusCode());
     }
 
     @Override
     public ResponseEntity<?> requestStatus(String referenceId) {
         String token = getToken().getAccess_token();
-        
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.add("Authorization", "Bearer " + token);
@@ -120,12 +126,14 @@ public class MomoServiceImpl implements IMomoService {
         headers.add("Ocp-Apim-Subscription-Key", env.getProperty("Ocp-Apim-Subscription-Key"));
         HttpEntity<String> entity = new HttpEntity<>(headers);
         String url = env.getProperty("collection.request-status-url") + referenceId;
-        ResponseEntity<?> responseEntity = template.exchange(url,
-        HttpMethod.GET, entity, new ParameterizedTypeReference<String>() {
-        });
-
+        ResponseEntity<?> responseEntity = template.exchange(url, HttpMethod.GET, entity,
+                new ParameterizedTypeReference<String>() {
+                });
+        Gson gson = new Gson();
+        Map<?,?> res = gson.fromJson((String) responseEntity.getBody(), Map.class);
+        String status = (String) res.get("status");
+        responseService.setStusRequest(referenceId, status);
         return responseEntity;
     }
-    
-    
+
 }
