@@ -1,5 +1,7 @@
 package rw.momo.api.momoapi.sevice;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -21,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import rw.momo.api.momoapi.config.MomoConfig;
 import rw.momo.api.momoapi.model.BalanceResponse;
 import rw.momo.api.momoapi.model.PayRequest;
 import rw.momo.api.momoapi.model.PayResponse;
@@ -30,12 +33,14 @@ import rw.momo.api.momoapi.model.TokenResponse;
 public class MomoServiceImpl implements IMomoService {
     Environment env;
     RestTemplate template;
-    IResponseService responseService;
+    ResponseService responseService;
+    @Autowired
+    MomoConfig config;
 
     Logger LOGGER = LoggerFactory.getLogger(MomoServiceImpl.class);
 
     @Autowired
-    public MomoServiceImpl( RestTemplate template, IResponseService responseService, Environment env) {
+    public MomoServiceImpl( RestTemplate template, ResponseService responseService, Environment env) {
         this.env = env;
         this.template = template;
         this.responseService = responseService;
@@ -52,11 +57,18 @@ public class MomoServiceImpl implements IMomoService {
         ResponseEntity<TokenResponse> responseEntity = template.exchange(env.getProperty("collection.token-url"),
                 HttpMethod.POST, entity, new ParameterizedTypeReference<TokenResponse>() {
                 });
+        config.setToken(responseEntity.getBody().getAccess_token());
+        LocalDateTime time= LocalDateTime.now();
+        // time.plusSeconds(responseEntity.getBody().getExpires_in());
+        LocalDateTime time2 = config.getExpires_in();
+        config.setExpires_in(time.plusSeconds(responseEntity.getBody().getExpires_in()));
+        LocalDateTime time3 = config.getExpires_in();
         return responseEntity.getBody();
     }
 
     @Override
     public BalanceResponse getBalance() {
+        // if(config.getExpires_in());
         String token = getToken().getAccess_token();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -85,11 +97,13 @@ public class MomoServiceImpl implements IMomoService {
 
     @Override
     public ResponseEntity<PayResponse> requestToPay(PayRequest request) {
-
-        String token = getToken().getAccess_token();
+        if(config.getToken().isEmpty() || config.getExpires_in() == null || config.getExpires_in().isBefore(LocalDateTime.now())) {
+            getToken();
+        }
+        
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.add("Authorization", "Bearer " + token);
+        headers.add("Authorization", "Bearer " + config.getToken());
         // headers.add("X-Callback-Url", "localhost:9004/momo/callback/pay-request");
         String refId = UUID.randomUUID().toString();
         headers.add("X-Reference-Id", refId);
@@ -110,9 +124,9 @@ public class MomoServiceImpl implements IMomoService {
         PayResponse res = new PayResponse();
         BeanUtils.copyProperties(request, res);
         res.setReferenceId(refId);
-        res = responseService.createRequest(res);
+        PayResponse res1 = responseService.createRequest(res);
         body.put("Reference-Id", refId);
-        return new ResponseEntity<PayResponse>(res, responseEntity.getStatusCode());
+        return new ResponseEntity<PayResponse>(res1, responseEntity.getStatusCode());
     }
 
     @Override

@@ -3,6 +3,7 @@ package rw.momo.api.momoapi.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
@@ -11,11 +12,17 @@ import com.google.gson.Gson;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.client.RestClientTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.client.match.MockRestRequestMatchers;
 import org.springframework.test.web.client.response.MockRestResponseCreators;
@@ -30,6 +37,7 @@ import rw.momo.api.momoapi.model.TokenResponse;
 import rw.momo.api.momoapi.sevice.MomoServiceImpl;
 import rw.momo.api.momoapi.sevice.ResponseService;
 @RestClientTest(MomoServiceImpl.class)
+@ExtendWith(MockitoExtension.class)
 public class MomoServiceTestClient {
     @Autowired
     private MockRestServiceServer mockRestServiceServer;
@@ -40,6 +48,7 @@ public class MomoServiceTestClient {
     @MockBean
     private ResponseService responseService;
     @Autowired
+    @InjectMocks
     private MomoServiceImpl service;
     @BeforeEach
     void setUp () {
@@ -69,7 +78,7 @@ public class MomoServiceTestClient {
 
     }
     @Test
-    public void  payRequest_when_success() {
+    public void  payRequest_when_success() throws NullPointerException {
         String expToken = "{\"access_token\": \"token\",\"token_type\": \"string\",\"expires_in\": 0}";
 
         this.mockRestServiceServer.expect(MockRestRequestMatchers.requestTo(env.getProperty("collection.token-url"))).andRespond(MockRestResponseCreators.withSuccess(expToken, MediaType.APPLICATION_JSON));
@@ -98,9 +107,9 @@ public class MomoServiceTestClient {
         request.setPayer(new Payer("partyIdType", "partyId"));
         request.setPayerMessage("payerMessage");
         Gson gson = new Gson();
-
-        when(responseService.createRequest(response)).thenReturn(response);
-
+        doReturn(response).when(responseService).createRequest(response);
+        // Mockito.when(responseService.createRequest(response)).thenReturn(response);
+        // ResponseEntity<PayResponse> pay = service.requestToPay(request);
         PayResponse response1 = service.requestToPay(request).getBody();
         PayResponse response2 = gson.fromJson(expResp, PayResponse.class);
 
